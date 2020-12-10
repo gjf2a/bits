@@ -1,5 +1,33 @@
 use std::ops::BitXor;
 
+pub struct BitsComboIterator {
+    next_value: BitArray,
+    next_index: u64
+}
+
+impl BitsComboIterator {
+    fn new() -> Self {
+        BitsComboIterator {next_value: BitArray::new(), next_index: 0}
+    }
+}
+
+impl Iterator for BitsComboIterator {
+    type Item = BitArray;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.next_index == self.next_value.len() {
+            self.next_value.add(false);
+            self.next_index = 0;
+        } else if !self.next_value.is_set(self.next_index) {
+            self.next_value.set(self.next_index, true);
+            self.next_index += 1;
+        } else {
+            self.next_value.set(self.next_index, false);
+        }
+        Some(self.next_value.clone())
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct BitArray {
     bits: Vec<u64>,
@@ -18,6 +46,11 @@ impl BitArray {
     }
 
     pub fn all_combinations(size: usize) -> Vec<Self> {
+        BitsComboIterator::new()
+            .skip_while(|bits| bits.len() < size as u64)
+            .take_while(|bits| bits.len() == size as u64)
+            .collect()
+        /*
         if size == 0 {
             vec![BitArray::new()]
         } else {
@@ -31,6 +64,7 @@ impl BitArray {
             }
             result
         }
+        */
     }
 
     fn get_mask(index: u64) -> u64 {
