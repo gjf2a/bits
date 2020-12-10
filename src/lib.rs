@@ -17,6 +17,22 @@ impl BitArray {
         result
     }
 
+    pub fn all_combinations(size: usize) -> Vec<Self> {
+        if size == 0 {
+            vec![BitArray::new()]
+        } else {
+            let mut result = Vec::new();
+            for mut candidate in BitArray::all_combinations(size - 1) {
+                let mut candidate1 = candidate.clone();
+                candidate1.add(false);
+                result.push(candidate1);
+                candidate.add(true);
+                result.push(candidate);
+            }
+            result
+        }
+    }
+
     fn get_mask(index: u64) -> u64 {
         1 << BitArray::get_offset(index)
     }
@@ -136,5 +152,11 @@ mod tests {
         let mut b = BitArray::from(&[true, true, false, false, true]);
         b.set(2, true);
         assert_eq!(b, BitArray::from(&[true, true, true, false, true]));
+    }
+
+    #[test]
+    fn test_all_combinations() {
+        assert_eq!(BitArray::all_combinations(1), vec![BitArray::from(&[false]), BitArray::from(&[true])]);
+        assert_eq!(BitArray::all_combinations(2), vec![BitArray::from(&[false, false]), BitArray::from(&[false, true]), BitArray::from(&[true, false]), BitArray::from(&[true, true])]);
     }
 }
