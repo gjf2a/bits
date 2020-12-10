@@ -9,6 +9,14 @@ pub struct BitArray {
 impl BitArray {
     pub fn new() -> Self { Default::default() }
 
+    pub fn from(bits: &[bool]) -> Self {
+        let mut result = BitArray::new();
+        for bit in bits {
+            result.add(*bit);
+        }
+        result
+    }
+
     fn get_mask(index: u64) -> u64 {
         1 << BitArray::get_offset(index)
     }
@@ -121,5 +129,12 @@ mod tests {
         assert_eq!(b, b.clone());
         assert_eq!(b2, b2.clone());
         assert_eq!(b3, b3.clone());
+    }
+
+    #[test]
+    fn test_from() {
+        let mut b = BitArray::from(&[true, true, false, false, true]);
+        b.set(2, true);
+        assert_eq!(b, BitArray::from(&[true, true, true, false, true]));
     }
 }
