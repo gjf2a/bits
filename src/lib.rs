@@ -1,7 +1,7 @@
 use std::ops::BitXor;
 use smallvec::SmallVec;
 
-#[derive(Hash, Ord, PartialOrd, Clone, Debug, Default)]
+#[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Clone, Debug, Default)]
 pub struct BitArray {
     bits: SmallVec<[u64;4]>,
     size: u64,
@@ -77,14 +77,6 @@ impl BitArray {
         self.bits.iter().map(|word| word.count_ones() as u32).sum()
     }
 }
-
-impl PartialEq for BitArray {
-    fn eq(&self, other: &Self) -> bool {
-        self.len() == other.len() && (0..self.bits.len()).all(|i| self.bits[i] == other.bits[i])
-    }
-}
-
-impl Eq for BitArray {}
 
 pub fn distance(b1: &BitArray, b2: &BitArray) -> u32 {
     (b1 ^ b2).count_bits_on()
