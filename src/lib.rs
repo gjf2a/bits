@@ -1,8 +1,9 @@
 use std::ops::BitXor;
+use smallvec::SmallVec;
 
 #[derive(Clone, Debug, Default)]
 pub struct BitArray {
-    bits: Vec<u64>,
+    bits: SmallVec<[u64;4]>,
     size: u64,
 }
 
