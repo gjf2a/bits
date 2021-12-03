@@ -203,25 +203,6 @@ impl FromStr for BitArray {
     }
 }
 
-impl TryFrom<&BitArray> for u64 {
-    type Error = io::Error;
-
-    fn try_from(value: &BitArray) -> Result<Self, Self::Error> {
-        if value.len() <= 64 {
-            let mut converted = 0;
-            for bit in value.iter().rev() {
-                converted *= 2;
-                if bit {
-                    converted += 1;
-                }
-            }
-            Ok(converted)
-        } else {
-            Err(io::Error::new(io::ErrorKind::InvalidData, format!("BitArray has {} elements; too large to fit into u64", value.len()).as_str()))
-        }
-    }
-}
-
 impl From<&BitArray> for BigUint {
     fn from(value: &BitArray) -> Self {
         let mut converted: BigUint = Zero::zero();
@@ -311,7 +292,6 @@ mod tests {
     fn test_convert() {
         for (s, v) in [("1111", 15), ("0000", 0), ("1110", 14), ("1010", 10), ("0111", 7), ("0101", 5)] {
             let b = s.parse::<BitArray>().unwrap();
-            assert_eq!(u64::try_from(&b).unwrap(), v);
             assert_eq!(num::BigUint::from(&b), num::BigUint::from(v));
         }
     }
