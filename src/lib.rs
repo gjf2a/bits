@@ -3,6 +3,7 @@ use std::ops::{BitXor, Not};
 use std::str::FromStr;
 use smallvec::SmallVec;
 use std::io;
+use num::{BigUint, Zero, One};
 
 #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Clone, Debug, Default)]
 pub struct BitArray {
@@ -221,6 +222,19 @@ impl TryFrom<&BitArray> for u64 {
     }
 }
 
+impl From<&BitArray> for BigUint {
+    fn from(value: &BitArray) -> Self {
+        let mut converted: BigUint = Zero::zero();
+        for bit in value.iter().rev() {
+            converted *= BigUint::from(2 as usize);
+            if bit {
+                converted += BigUint::one();
+            }
+        }
+        converted
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -298,6 +312,7 @@ mod tests {
         for (s, v) in [("1111", 15), ("0000", 0), ("1110", 14), ("1010", 10), ("0111", 7), ("0101", 5)] {
             let b = s.parse::<BitArray>().unwrap();
             assert_eq!(u64::try_from(&b).unwrap(), v);
+            assert_eq!(num::BigUint::from(&b), num::BigUint::from(v));
         }
     }
 
