@@ -1,5 +1,7 @@
 use std::ops::BitXor;
+use std::str::FromStr;
 use smallvec::SmallVec;
+use std::io;
 
 #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Clone, Debug, Default)]
 pub struct BitArray {
@@ -10,12 +12,17 @@ pub struct BitArray {
 impl BitArray {
     pub fn new() -> Self { Default::default() }
 
-    pub fn from(bits: &[bool]) -> Self {
+    fn from(bits: &[bool]) -> Self {
+        // I tried implementing From<&[bool]> but it demanded a slice length in the trait bound.
         let mut result = BitArray::new();
         for bit in bits {
             result.add(*bit);
         }
         result
+    }
+
+    pub fn iter(&self) -> BitArrayIterator {
+        BitArrayIterator::iter_for(&self)
     }
 
     pub fn all_combinations(size: usize) -> Vec<Self> {
@@ -34,15 +41,15 @@ impl BitArray {
         }
     }
 
-    fn get_mask(index: u64) -> u64 {
-        1 << BitArray::get_offset(index)
+    fn make_mask(index: u64) -> u64 {
+        1 << BitArray::make_offset(index)
     }
 
-    fn get_offset(index: u64) -> u64 {
+    fn make_offset(index: u64) -> u64 {
         index % (BitArray::word_size() as u64)
     }
 
-    fn get_word(index: u64) -> usize {
+    fn make_word(index: u64) -> usize {
         (index as usize / BitArray::word_size()) as usize
     }
 
@@ -53,7 +60,7 @@ impl BitArray {
     pub fn len(&self) -> u64 {self.size}
 
     pub fn add(&mut self, value: bool) {
-        if BitArray::get_offset(self.size) == 0 {
+        if BitArray::make_offset(self.size) == 0 {
             self.bits.push(0);
         }
         self.set(self.size, value);
@@ -61,16 +68,16 @@ impl BitArray {
     }
 
     pub fn set(&mut self, index: u64, value: bool) {
-        let mask = BitArray::get_mask(index);
+        let mask = BitArray::make_mask(index);
         if value {
-            self.bits[BitArray::get_word(index)] |= mask;
+            self.bits[BitArray::make_word(index)] |= mask;
         } else {
-            self.bits[BitArray::get_word(index)] &= !mask;
+            self.bits[BitArray::make_word(index)] &= !mask;
         }
     }
 
     pub fn is_set(&self, index: u64) -> bool {
-        self.bits[BitArray::get_word(index)] & BitArray::get_mask(index) > 0
+        self.bits[BitArray::make_word(index)] & BitArray::make_mask(index) > 0
     }
 
     pub fn count_bits_on(&self) -> u32 {
@@ -92,6 +99,83 @@ impl BitXor for &BitArray {
             result.bits.push(self.bits[i] ^ rhs.bits[i]);
         }
         result
+    }
+}
+
+pub struct BitArrayIterator<'a> {
+    forward_index: u64,
+    back_index: u64,
+    src: &'a BitArray
+}
+
+impl <'a> BitArrayIterator<'a> {
+    pub fn iter_for(src: &'a BitArray) -> Self {
+        BitArrayIterator { forward_index: 0, back_index: src.len(), src}
+    }
+
+    fn valid(&self) -> bool {
+        self.forward_index < self.back_index
+    }
+}
+
+impl <'a> Iterator for BitArrayIterator<'a> {
+    type Item = bool;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.valid() {
+            let result = Some(self.src.is_set(self.forward_index));
+            self.forward_index += 1;
+            result
+        } else {
+            None
+        }
+    }
+}
+
+impl <'a> DoubleEndedIterator for BitArrayIterator<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.valid() {
+            self.back_index -= 1;
+            let result = Some(self.src.is_set(self.back_index));
+            result
+        } else {
+            None
+        }
+    }
+}
+
+impl FromStr for BitArray {
+    type Err = io::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut result = BitArray::new();
+        for ch in s.chars().rev() {
+            result.add(match ch {
+                '0' => false,
+                '1' => true,
+                other => return Err(io::Error::new(io::ErrorKind::InvalidData, format!("Illegal digit parsing BitArray: {}", other).as_str()))
+            })
+        }
+        Ok(result)
+    }
+}
+
+impl TryFrom<&BitArray> for u64 {
+    type Error = io::Error;
+
+    fn try_from(value: &BitArray) -> Result<Self, Self::Error> {
+        if value.len() <= 64 {
+            let mut converted = 0;
+            for bit in value.iter().rev() {
+                converted *= 2;
+                if bit {
+                    converted += 1;
+                }
+            }
+            Ok(converted)
+        } else {
+            Err(io::Error::new(io::ErrorKind::InvalidData, format!("BitArray has {} elements; too large to fit into u64", value.len()).as_str()))
+        }
     }
 }
 
@@ -151,5 +235,41 @@ mod tests {
     fn test_all_combinations() {
         assert_eq!(BitArray::all_combinations(1), vec![BitArray::from(&[false]), BitArray::from(&[true])]);
         assert_eq!(BitArray::all_combinations(2), vec![BitArray::from(&[false, false]), BitArray::from(&[false, true]), BitArray::from(&[true, false]), BitArray::from(&[true, true])]);
+    }
+
+    #[test]
+    fn test_parse() {
+        // Note:
+        //
+        // The low-order bit in a string is the rightmost bit, while the
+        // low-order bit in the source array is the leftmost element.
+        for (b, s) in [
+            (BitArray::from(&[true, false, false, true, true, false, true]), "1011001"),
+            (BitArray::from(&[false, true, true, false, true, true, true]), "1110110")
+        ] {
+            assert_eq!(b, s.parse::<BitArray>().unwrap());
+        }
+    }
+
+    #[test]
+    fn test_convert() {
+        for (s, v) in [("1111", 15), ("0000", 0), ("1110", 14), ("1010", 10), ("0111", 7), ("0101", 5)] {
+            let b = s.parse::<BitArray>().unwrap();
+            assert_eq!(u64::try_from(&b).unwrap(), v);
+        }
+    }
+
+    #[test]
+    fn test_iter() {
+        for bool_vals in [[true, true, false, false, true], [false, true, false, false, false]] {
+            let b = BitArray::from(&bool_vals);
+            for (i, val) in b.iter().enumerate() {
+                assert_eq!(val, bool_vals[i]);
+            }
+            for (i, val) in b.iter().rev().enumerate() {
+                let target_i = bool_vals.len() - (i + 1);
+                assert_eq!(val, bool_vals[target_i]);
+            }
+        }
     }
 }
