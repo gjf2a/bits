@@ -15,11 +15,7 @@ impl BitArray {
 
     fn from(bits: &[bool]) -> Self {
         // I tried implementing From<&[bool]> but it demanded a slice length in the trait bound.
-        let mut result = BitArray::new();
-        for bit in bits {
-            result.add(*bit);
-        }
-        result
+        bits.iter().collect()
     }
 
     pub fn iter(&self) -> BitArrayIterator {
@@ -100,6 +96,26 @@ impl Display for BitArray {
     }
 }
 
+impl FromIterator<bool> for BitArray {
+    fn from_iter<T: IntoIterator<Item=bool>>(iter: T) -> Self {
+        let mut result = BitArray::new();
+        for value in iter {
+            result.add(value);
+        }
+        result
+    }
+}
+
+impl <'a> FromIterator<&'a bool> for BitArray {
+    fn from_iter<T: IntoIterator<Item=&'a bool>>(iter: T) -> Self {
+        let mut result = BitArray::new();
+        for value in iter {
+            result.add(*value);
+        }
+        result
+    }
+}
+
 impl BitXor for &BitArray {
     type Output = BitArray;
 
@@ -117,11 +133,7 @@ impl Not for &BitArray {
     type Output = BitArray;
 
     fn not(self) -> Self::Output {
-        let mut result = BitArray::new();
-        for value in self.iter() {
-            result.add(!value);
-        }
-        result
+        self.iter().map(|v| !v).collect()
     }
 }
 
@@ -293,6 +305,8 @@ mod tests {
                 let target_i = bool_vals.len() - (i + 1);
                 assert_eq!(val, bool_vals[target_i]);
             }
+            let bc: BitArray = bool_vals.iter().collect();
+            assert_eq!(b, bc);
         }
     }
 
