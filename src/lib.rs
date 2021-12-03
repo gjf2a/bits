@@ -165,6 +165,11 @@ impl <'a> Iterator for BitArrayIterator<'a> {
             None
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let size = (self.back_index - self.forward_index) as usize;
+        (size, Some(size))
+    }
 }
 
 impl <'a> DoubleEndedIterator for BitArrayIterator<'a> {
@@ -177,6 +182,10 @@ impl <'a> DoubleEndedIterator for BitArrayIterator<'a> {
             None
         }
     }
+}
+
+impl <'a> ExactSizeIterator for BitArrayIterator<'a> {
+    
 }
 
 impl FromStr for BitArray {
@@ -325,5 +334,26 @@ mod tests {
             let b: BitArray = s.parse().unwrap();
             assert_eq!(s, format!("{}", b).as_str());
         }
+    }
+
+    #[test]
+    fn test_not() {
+        let b: BitArray = "1011".parse().unwrap();
+        let nb: BitArray = !&b;
+        let nnb: BitArray = !&nb;
+        assert_eq!(b, nnb);
+        assert_ne!(b, nb);
+    }
+
+    #[test]
+    fn test_zip() {
+        let b1: BitArray = "1001".parse().unwrap();
+        let b2: BitArray = "0010".parse().unwrap();
+        let result: BitArray = b1.iter()
+            .zip(b2.iter())
+            .rev()
+            .map(|(bit1, bit2)| bit1 || bit2)
+            .collect();
+        assert_eq!(result, "1101".parse().unwrap());
     }
 }
