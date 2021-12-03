@@ -1,4 +1,4 @@
-use std::ops::BitXor;
+use std::ops::{BitXor, Not};
 use std::str::FromStr;
 use smallvec::SmallVec;
 use std::io;
@@ -97,6 +97,18 @@ impl BitXor for &BitArray {
         let mut result = BitArray::new();
         for i in 0..self.bits.len() {
             result.bits.push(self.bits[i] ^ rhs.bits[i]);
+        }
+        result
+    }
+}
+
+impl Not for &BitArray {
+    type Output = BitArray;
+
+    fn not(self) -> Self::Output {
+        let mut result = BitArray::new();
+        for value in self.iter() {
+            result.add(!value);
         }
         result
     }
@@ -270,6 +282,15 @@ mod tests {
                 let target_i = bool_vals.len() - (i + 1);
                 assert_eq!(val, bool_vals[target_i]);
             }
+        }
+    }
+
+    #[test]
+    fn test_negation() {
+        for (b_s, inv_b_s) in [("10110", "01001"), ("11111", "00000")] {
+            let b: BitArray = b_s.parse().unwrap();
+            let inv_b: BitArray = inv_b_s.parse().unwrap();
+            assert_eq!(!&b, inv_b);
         }
     }
 }
