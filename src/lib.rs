@@ -339,8 +339,8 @@ mod tests {
     #[test]
     fn test_not() {
         let b: BitArray = "1011".parse().unwrap();
-        let nb: BitArray = !&b;
-        let nnb: BitArray = !&nb;
+        let nb = !&b;
+        let nnb = !&nb;
         assert_eq!(b, nnb);
         assert_ne!(b, nb);
     }
