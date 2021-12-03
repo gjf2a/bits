@@ -184,9 +184,7 @@ impl <'a> DoubleEndedIterator for BitArrayIterator<'a> {
     }
 }
 
-impl <'a> ExactSizeIterator for BitArrayIterator<'a> {
-    
-}
+impl <'a> ExactSizeIterator for BitArrayIterator<'a> {}
 
 impl FromStr for BitArray {
     type Err = io::Error;
@@ -208,8 +206,15 @@ impl TryFrom<&BitArray> for u64 {
     type Error = io::Error;
 
     fn try_from(value: &BitArray) -> Result<Self, Self::Error> {
-        if value.len() as usize <= 64 {
-            Ok(value.bits[0])
+        if value.len() <= 64 {
+            let mut converted = 0;
+            for bit in value.iter().rev() {
+                converted *= 2;
+                if bit {
+                    converted += 1;
+                }
+            }
+            Ok(converted)
         } else {
             Err(io::Error::new(io::ErrorKind::InvalidData, format!("BitArray has {} elements; too large to fit into u64", value.len()).as_str()))
         }
