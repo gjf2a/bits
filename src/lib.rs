@@ -3,7 +3,6 @@ use std::ops::{BitXor, Not};
 use std::str::FromStr;
 use smallvec::SmallVec;
 use std::io;
-use std::mem::size_of;
 
 #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Clone, Debug, Default)]
 pub struct BitArray {
@@ -209,7 +208,7 @@ impl TryFrom<&BitArray> for u64 {
     type Error = io::Error;
 
     fn try_from(value: &BitArray) -> Result<Self, Self::Error> {
-        if value.len() as usize <= size_of::<u64>() {
+        if value.len() as usize <= 64 {
             Ok(value.bits[0])
         } else {
             Err(io::Error::new(io::ErrorKind::InvalidData, format!("BitArray has {} elements; too large to fit into u64", value.len()).as_str()))
