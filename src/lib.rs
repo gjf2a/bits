@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::ops::{BitXor, Not};
 use std::str::FromStr;
 use smallvec::SmallVec;
@@ -87,6 +88,16 @@ impl BitArray {
 
 pub fn distance(b1: &BitArray, b2: &BitArray) -> u32 {
     (b1 ^ b2).count_bits_on()
+}
+
+impl Display for BitArray {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut s = String::new();
+        for value in self.iter().rev() {
+            s.push(if value {'1'} else {'0'});
+        }
+        write!(f, "{}", s)
+    }
 }
 
 impl BitXor for &BitArray {
@@ -291,6 +302,14 @@ mod tests {
             let b: BitArray = b_s.parse().unwrap();
             let inv_b: BitArray = inv_b_s.parse().unwrap();
             assert_eq!(!&b, inv_b);
+        }
+    }
+
+    #[test]
+    fn test_display() {
+        for s in ["1010", "1111", "0101", "0000"] {
+            let b: BitArray = s.parse().unwrap();
+            assert_eq!(s, format!("{}", b).as_str());
         }
     }
 }
