@@ -1,5 +1,5 @@
 use std::fmt::{Display, Formatter};
-use std::ops::{BitXor, Not};
+use std::ops::{BitAnd, BitOr, BitXor, Not};
 use std::str::FromStr;
 use smallvec::SmallVec;
 use std::io;
@@ -117,16 +117,37 @@ impl <'a> FromIterator<&'a bool> for BitArray {
     }
 }
 
+fn create_from(one: &BitArray, two: &BitArray, op: fn(u64,u64) -> u64) -> BitArray {
+    assert_eq!(one.len(), two.len());
+    let mut result = BitArray::new();
+    result.size = one.len();
+    for i in 0..one.bits.len() {
+        result.bits.push(op(one.bits[i], two.bits[i]));
+    }
+    result
+}
+
 impl BitXor for &BitArray {
     type Output = BitArray;
 
     fn bitxor(self, rhs: Self) -> Self::Output {
-        assert_eq!(self.len(), rhs.len());
-        let mut result = BitArray::new();
-        for i in 0..self.bits.len() {
-            result.bits.push(self.bits[i] ^ rhs.bits[i]);
-        }
-        result
+        create_from(self, rhs, |a, b| a ^ b)
+    }
+}
+
+impl BitAnd for &BitArray {
+    type Output = BitArray;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        create_from(self, rhs, |a, b| a & b)
+    }
+}
+
+impl BitOr for &BitArray {
+    type Output = BitArray;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        create_from(self, rhs, |a, b| a | b)
     }
 }
 
@@ -292,7 +313,7 @@ mod tests {
     fn test_convert() {
         for (s, v) in [("1111", 15), ("0000", 0), ("1110", 14), ("1010", 10), ("0111", 7), ("0101", 5)] {
             let b = s.parse::<BitArray>().unwrap();
-            assert_eq!(num::BigUint::from(&b), num::BigUint::from(v));
+            assert_eq!(num::BigUint::from(&b), num::BigUint::from(v as u32));
         }
     }
 
@@ -314,10 +335,14 @@ mod tests {
 
     #[test]
     fn test_negation() {
+        let ones: BitArray = "11111".parse().unwrap();
+        let zeros: BitArray = "00000".parse().unwrap();
         for (b_s, inv_b_s) in [("10110", "01001"), ("11111", "00000")] {
             let b: BitArray = b_s.parse().unwrap();
             let inv_b: BitArray = inv_b_s.parse().unwrap();
             assert_eq!(!&b, inv_b);
+            assert_eq!(&b & &inv_b, zeros);
+            assert_eq!(&b | &inv_b, ones);
         }
     }
 
