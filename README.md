@@ -35,6 +35,20 @@ assert_eq!(b, "1101".parse().unwrap());
 assert_eq!(num::BigUint::from(&b), num::BigUint::from(13 as u32));
 ```
 
+`BitArray` objects can also be created by specifying a number of zeros or ones for initialization.
+
+```
+use bits::*;
+
+let z = BitArray::zeros(10);
+assert_eq!(z.len(), 10);
+//assert_eq!(z, "0000000000".parse().unwrap());
+
+let n = BitArray::ones(10);
+assert_eq!(n.len(), 10);
+//assert_eq!(n, "1111111111".parse().unwrap());
+```
+
 Some miscellaneous utilities include the ability to count bits, compute distances, and create
 combinations.
 

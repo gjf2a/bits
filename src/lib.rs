@@ -34,6 +34,21 @@
 //! assert_eq!(num::BigUint::from(&b), num::BigUint::from(13 as u32));
 //! ```
 //!
+//! `BitArray` objects can also be created by specifying a number of zeros or ones for
+//! initialization.
+//!
+//! ```
+//! use bits::*;
+//!
+//! let z = BitArray::zeros(10);
+//! assert_eq!(z.len(), 10);
+//! //assert_eq!(z, "0000000000".parse().unwrap());
+//!
+//! let n = BitArray::ones(10);
+//! assert_eq!(n.len(), 10);
+//! //assert_eq!(n, "1111111111".parse().unwrap());
+//! ```
+//!
 //! Some miscellaneous utilities include the ability to count bits, compute distances, and create
 //! combinations.
 //!
@@ -68,6 +83,24 @@ pub struct BitArray {
 impl BitArray {
     pub fn new() -> Self { Default::default() }
 
+    pub fn zeros(num_zeros: u64) -> Self {
+        let size = num_zeros;
+        let mut num_words = num_zeros / 64;
+        if num_zeros % 64 > 0 {
+            num_words += 1;
+        }
+        println!("num_words:{}", num_words);
+        let mut bits = SmallVec::new();
+        for _ in 0..num_words {
+            bits.push(0);
+        }
+        BitArray {bits, size}
+    }
+
+    pub fn ones(num_ones: u64) -> Self {
+        !&BitArray::zeros(num_ones)
+    }
+
     pub fn from(bits: &[bool]) -> Self {
         // I tried implementing From<&[bool]> but it demanded a slice length in the trait bound.
         bits.iter().collect()
@@ -94,25 +127,25 @@ impl BitArray {
     }
 
     fn make_mask(index: u64) -> u64 {
-        1 << BitArray::make_offset(index)
+        1 << BitArray::find_offset(index)
     }
 
-    fn make_offset(index: u64) -> u64 {
-        index % (BitArray::word_size() as u64)
+    fn find_offset(index: u64) -> u64 {
+        index % (BitArray::bits_per_word() as u64)
     }
 
-    fn make_word(index: u64) -> usize {
-        (index as usize / BitArray::word_size()) as usize
+    fn find_word(index: u64) -> usize {
+        (index as usize / BitArray::bits_per_word()) as usize
     }
 
-    pub fn word_size() -> usize {
-        std::mem::size_of::<u64>()
+    pub fn bits_per_word() -> usize {
+        std::mem::size_of::<u64>() * 8
     }
 
     pub fn len(&self) -> u64 {self.size}
 
     pub fn add(&mut self, value: bool) {
-        if BitArray::make_offset(self.size) == 0 {
+        if BitArray::find_offset(self.size) == 0 {
             self.bits.push(0);
         }
         self.set(self.size, value);
@@ -122,14 +155,14 @@ impl BitArray {
     pub fn set(&mut self, index: u64, value: bool) {
         let mask = BitArray::make_mask(index);
         if value {
-            self.bits[BitArray::make_word(index)] |= mask;
+            self.bits[BitArray::find_word(index)] |= mask;
         } else {
-            self.bits[BitArray::make_word(index)] &= !mask;
+            self.bits[BitArray::find_word(index)] &= !mask;
         }
     }
 
     pub fn is_set(&self, index: u64) -> bool {
-        self.bits[BitArray::make_word(index)] & BitArray::make_mask(index) > 0
+        self.bits[BitArray::find_word(index)] & BitArray::make_mask(index) > 0
     }
 
     pub fn count_bits_on(&self) -> u32 {
@@ -309,10 +342,10 @@ mod tests {
         assert!(b.is_set(1));
         assert_eq!(1, b.count_bits_on());
 
-        for _ in 0..BitArray::word_size() {
+        for _ in 0..BitArray::bits_per_word() {
             b.add(true);
         }
-        assert_eq!(BitArray::word_size() + 2, b.len() as usize);
+        assert_eq!(BitArray::bits_per_word() + 2, b.len() as usize);
         for i in 1..b.len() {
             assert!(b.is_set(i));
         }
@@ -427,5 +460,16 @@ mod tests {
             .map(|(bit1, bit2)| bit1 || bit2)
             .collect();
         assert_eq!(result, "1101".parse().unwrap());
+    }
+
+    #[test]
+    fn test_zeros_ones() {
+        let z = BitArray::zeros(80);
+        let n = BitArray::ones(80);
+
+        assert_eq!(z.len(), 80);
+        assert_eq!(z, "00000000000000000000000000000000000000000000000000000000000000000000000000000000".parse().unwrap());
+        assert_eq!(n.len(), 80);
+        assert_eq!(n, "11111111111111111111111111111111111111111111111111111111111111111111111111111111".parse().unwrap());
     }
 }
