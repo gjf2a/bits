@@ -195,12 +195,12 @@ impl BitArray {
         self.bits[BitArray::find_word(index)] & BitArray::make_mask(index) > 0
     }
 
-    pub fn count_bits_on(&self) -> u32 {
-        self.bits.iter().map(|word| word.count_ones() as u32).sum()
+    pub fn count_bits_on(&self) -> u64 {
+        self.bits.iter().map(|word| word.count_ones() as u64).sum()
     }
 }
 
-pub fn distance(b1: &BitArray, b2: &BitArray) -> u32 {
+pub fn distance(b1: &BitArray, b2: &BitArray) -> u64 {
     (b1 ^ b2).count_bits_on()
 }
 
@@ -388,7 +388,7 @@ mod tests {
         for i in 1..b.len() {
             assert!(b.is_set(i));
         }
-        assert_eq!(b.len() as u32 - 1, b.count_bits_on());
+        assert_eq!(b.len() as u64 - 1, b.count_bits_on());
 
         let mut b2 = BitArray::new();
         for i in 0..b.len() {
@@ -396,7 +396,7 @@ mod tests {
         }
 
         let b3 = &b ^ &b2;
-        assert_eq!((b.len() as u32 / 2) + 1, b3.count_bits_on());
+        assert_eq!((b.len() as u64 / 2) + 1, b3.count_bits_on());
         assert_eq!(b3.count_bits_on(), distance(&b, &b2));
 
         assert_ne!(b, b2);
