@@ -34,6 +34,30 @@
 //! assert_eq!(num::BigUint::from(&b), num::BigUint::from(13 as u32));
 //! ```
 //!
+//! `BitArray` objects can also be expanded and modified using the `set()` method.
+//! Any gaps will be filled in with zeros.
+//!
+//! ```
+//! use bits::*;
+//!
+//! let mut b = BitArray::new();
+//! b.set(0, true);
+//! b.set(2, true);
+//! b.set(3, true);
+//!
+//! assert_eq!(b, "1101".parse().unwrap());
+//! assert_eq!(num::BigUint::from(&b), num::BigUint::from(13 as u32));
+//!
+//! b.set(0, false);
+//! b.set(3, false);
+//! assert_eq!(b, "0100".parse().unwrap());
+//! 
+//! b.set(500, true);
+//! assert!(b.is_set(500));
+//! assert_eq!(b.len(), 501);
+//! assert_eq!(b.count_bits_on(), 2);
+//! ```
+//!
 //! `BitArray` objects can also be created by specifying a number of zeros or ones for
 //! initialization.
 //!
@@ -67,21 +91,23 @@
 //! assert_eq!(c, cv);
 //! ```
 
+use num::{BigUint, One, Zero};
+use smallvec::SmallVec;
 use std::fmt::{Display, Formatter};
+use std::io;
 use std::ops::{BitAnd, BitOr, BitXor, Not};
 use std::str::FromStr;
-use smallvec::SmallVec;
-use std::io;
-use num::{BigUint, Zero, One};
 
 #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Clone, Debug, Default)]
 pub struct BitArray {
-    bits: SmallVec<[u64;4]>,
+    bits: SmallVec<[u64; 4]>,
     size: u64,
 }
 
 impl BitArray {
-    pub fn new() -> Self { Default::default() }
+    pub fn new() -> Self {
+        Default::default()
+    }
 
     pub fn zeros(num_zeros: u64) -> Self {
         let size = num_zeros;
@@ -94,7 +120,7 @@ impl BitArray {
         for _ in 0..num_words {
             bits.push(0);
         }
-        BitArray {bits, size}
+        BitArray { bits, size }
     }
 
     pub fn ones(num_ones: u64) -> Self {
@@ -142,17 +168,21 @@ impl BitArray {
         std::mem::size_of::<u64>() * 8
     }
 
-    pub fn len(&self) -> u64 {self.size}
+    pub fn len(&self) -> u64 {
+        self.size
+    }
 
     pub fn add(&mut self, value: bool) {
-        if BitArray::find_offset(self.size) == 0 {
-            self.bits.push(0);
-        }
         self.set(self.size, value);
-        self.size += 1;
     }
 
     pub fn set(&mut self, index: u64, value: bool) {
+        while self.bits.len() < 1 + BitArray::find_word(index) {
+            self.bits.push(0);
+        }
+        if self.size < 1 + index {
+            self.size = 1 + index;
+        }
         let mask = BitArray::make_mask(index);
         if value {
             self.bits[BitArray::find_word(index)] |= mask;
@@ -178,14 +208,14 @@ impl Display for BitArray {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut s = String::new();
         for value in self.iter().rev() {
-            s.push(if value {'1'} else {'0'});
+            s.push(if value { '1' } else { '0' });
         }
         write!(f, "{}", s)
     }
 }
 
 impl FromIterator<bool> for BitArray {
-    fn from_iter<T: IntoIterator<Item=bool>>(iter: T) -> Self {
+    fn from_iter<T: IntoIterator<Item = bool>>(iter: T) -> Self {
         let mut result = BitArray::new();
         for value in iter {
             result.add(value);
@@ -194,8 +224,8 @@ impl FromIterator<bool> for BitArray {
     }
 }
 
-impl <'a> FromIterator<&'a bool> for BitArray {
-    fn from_iter<T: IntoIterator<Item=&'a bool>>(iter: T) -> Self {
+impl<'a> FromIterator<&'a bool> for BitArray {
+    fn from_iter<T: IntoIterator<Item = &'a bool>>(iter: T) -> Self {
         let mut result = BitArray::new();
         for value in iter {
             result.add(*value);
@@ -204,7 +234,7 @@ impl <'a> FromIterator<&'a bool> for BitArray {
     }
 }
 
-fn create_from(one: &BitArray, two: &BitArray, op: fn(u64,u64) -> u64) -> BitArray {
+fn create_from(one: &BitArray, two: &BitArray, op: fn(u64, u64) -> u64) -> BitArray {
     assert_eq!(one.len(), two.len());
     let mut result = BitArray::new();
     result.size = one.len();
@@ -249,12 +279,16 @@ impl Not for &BitArray {
 pub struct BitArrayIterator<'a> {
     forward_index: u64,
     back_index: u64,
-    src: &'a BitArray
+    src: &'a BitArray,
 }
 
-impl <'a> BitArrayIterator<'a> {
+impl<'a> BitArrayIterator<'a> {
     pub fn iter_for(src: &'a BitArray) -> Self {
-        BitArrayIterator { forward_index: 0, back_index: src.len(), src}
+        BitArrayIterator {
+            forward_index: 0,
+            back_index: src.len(),
+            src,
+        }
     }
 
     fn valid(&self) -> bool {
@@ -262,7 +296,7 @@ impl <'a> BitArrayIterator<'a> {
     }
 }
 
-impl <'a> Iterator for BitArrayIterator<'a> {
+impl<'a> Iterator for BitArrayIterator<'a> {
     type Item = bool;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -281,7 +315,7 @@ impl <'a> Iterator for BitArrayIterator<'a> {
     }
 }
 
-impl <'a> DoubleEndedIterator for BitArrayIterator<'a> {
+impl<'a> DoubleEndedIterator for BitArrayIterator<'a> {
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.valid() {
             self.back_index -= 1;
@@ -293,7 +327,7 @@ impl <'a> DoubleEndedIterator for BitArrayIterator<'a> {
     }
 }
 
-impl <'a> ExactSizeIterator for BitArrayIterator<'a> {}
+impl<'a> ExactSizeIterator for BitArrayIterator<'a> {}
 
 impl FromStr for BitArray {
     type Err = io::Error;
@@ -304,7 +338,12 @@ impl FromStr for BitArray {
             result.add(match ch {
                 '0' => false,
                 '1' => true,
-                other => return Err(io::Error::new(io::ErrorKind::InvalidData, format!("Illegal digit parsing BitArray: {}", other).as_str()))
+                other => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("Illegal digit parsing BitArray: {}", other).as_str(),
+                    ))
+                }
             })
         }
         Ok(result)
@@ -370,6 +409,21 @@ mod tests {
     }
 
     #[test]
+    fn test_expand_set() {
+        let mut b = BitArray::new();
+        b.set(0, true);
+        b.set(2, true);
+        b.set(3, true);
+
+        assert_eq!(b, "1101".parse().unwrap());
+        assert_eq!(num::BigUint::from(&b), num::BigUint::from(13 as u32));
+
+        b.set(0, false);
+        b.set(3, false);
+        assert_eq!(b, "0100".parse().unwrap());
+    }
+
+    #[test]
     fn test_from() {
         let mut b = BitArray::from(&[true, true, false, false, true]);
         b.set(2, true);
@@ -378,8 +432,19 @@ mod tests {
 
     #[test]
     fn test_all_combinations() {
-        assert_eq!(BitArray::all_combinations(1), vec![BitArray::from(&[false]), BitArray::from(&[true])]);
-        assert_eq!(BitArray::all_combinations(2), vec![BitArray::from(&[false, false]), BitArray::from(&[false, true]), BitArray::from(&[true, false]), BitArray::from(&[true, true])]);
+        assert_eq!(
+            BitArray::all_combinations(1),
+            vec![BitArray::from(&[false]), BitArray::from(&[true])]
+        );
+        assert_eq!(
+            BitArray::all_combinations(2),
+            vec![
+                BitArray::from(&[false, false]),
+                BitArray::from(&[false, true]),
+                BitArray::from(&[true, false]),
+                BitArray::from(&[true, true])
+            ]
+        );
     }
 
     #[test]
@@ -389,8 +454,14 @@ mod tests {
         // The low-order bit in a string is the rightmost bit, while the
         // low-order bit in the source array is the leftmost element.
         for (b, s) in [
-            (BitArray::from(&[true, false, false, true, true, false, true]), "1011001"),
-            (BitArray::from(&[false, true, true, false, true, true, true]), "1110110")
+            (
+                BitArray::from(&[true, false, false, true, true, false, true]),
+                "1011001",
+            ),
+            (
+                BitArray::from(&[false, true, true, false, true, true, true]),
+                "1110110",
+            ),
         ] {
             assert_eq!(b, s.parse::<BitArray>().unwrap());
         }
@@ -398,7 +469,14 @@ mod tests {
 
     #[test]
     fn test_convert() {
-        for (s, v) in [("1111", 15), ("0000", 0), ("1110", 14), ("1010", 10), ("0111", 7), ("0101", 5)] {
+        for (s, v) in [
+            ("1111", 15),
+            ("0000", 0),
+            ("1110", 14),
+            ("1010", 10),
+            ("0111", 7),
+            ("0101", 5),
+        ] {
             let b = s.parse::<BitArray>().unwrap();
             assert_eq!(num::BigUint::from(&b), num::BigUint::from(v as u32));
         }
@@ -406,7 +484,10 @@ mod tests {
 
     #[test]
     fn test_iter() {
-        for bool_vals in [[true, true, false, false, true], [false, true, false, false, false]] {
+        for bool_vals in [
+            [true, true, false, false, true],
+            [false, true, false, false, false],
+        ] {
             let b = BitArray::from(&bool_vals);
             for (i, val) in b.iter().enumerate() {
                 assert_eq!(val, bool_vals[i]);
@@ -454,7 +535,8 @@ mod tests {
     fn test_zip() {
         let b1: BitArray = "1001".parse().unwrap();
         let b2: BitArray = "0010".parse().unwrap();
-        let result: BitArray = b1.iter()
+        let result: BitArray = b1
+            .iter()
             .zip(b2.iter())
             .rev()
             .map(|(bit1, bit2)| bit1 || bit2)
@@ -468,8 +550,18 @@ mod tests {
         let n = BitArray::ones(80);
 
         assert_eq!(z.len(), 80);
-        assert_eq!(z, "00000000000000000000000000000000000000000000000000000000000000000000000000000000".parse().unwrap());
+        assert_eq!(
+            z,
+            "00000000000000000000000000000000000000000000000000000000000000000000000000000000"
+                .parse()
+                .unwrap()
+        );
         assert_eq!(n.len(), 80);
-        assert_eq!(n, "11111111111111111111111111111111111111111111111111111111111111111111111111111111".parse().unwrap());
+        assert_eq!(
+            n,
+            "11111111111111111111111111111111111111111111111111111111111111111111111111111111"
+                .parse()
+                .unwrap()
+        );
     }
 }
