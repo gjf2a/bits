@@ -3,19 +3,27 @@
 //! the `&`, `|` and `^` binary operators and the `!` unary operator. Because copies could get
 //! expensive, these operators are intended to be used by reference.
 //!
-//! If the lengths of the arguments to a binary operator differ, it will **panic**.
+//! If the lengths of the arguments to a binary operator differ:
+//! * The `&` operator will **panic**.
+//! * The '|' and '^' operators will produce a result with the same length as the longer argument, with `false` as the implicit value of the missing bits of the smaller argument.
 //!
 //! ```
 //! use bits::*;
 //!
 //! let b1: BitArray = "1101".parse().unwrap();
 //! let b2: BitArray = "0110".parse().unwrap();
-//!
+//! 
 //! assert_eq!(&b1 & &b2, "0100".parse().unwrap());
 //! assert_eq!(&b1 | &b2, "1111".parse().unwrap());
 //! assert_eq!(&b1 ^ &b2, "1011".parse().unwrap());
 //! assert_eq!(!&b1, "0010".parse().unwrap());
 //! assert_eq!(!&!&b2, b2);
+//! 
+//! let b3: BitArray = "10".parse().unwrap();
+//! assert_eq!(&b1 | &b3, BitArray::ones(4));
+//! assert_eq!(&b2 | &b3, b2);
+//! assert_eq!(&b1 ^ &b3, BitArray::ones(4));
+//! assert_eq!(&b2 ^ &b3, "0100".parse().unwrap());
 //! ```
 //!
 //! `BitArray` objects can be built incrementally using the `add()` method. The first digit
@@ -66,11 +74,11 @@
 //!
 //! let z = BitArray::zeros(10);
 //! assert_eq!(z.len(), 10);
-//! //assert_eq!(z, "0000000000".parse().unwrap());
+//! assert_eq!(z, "0000000000".parse().unwrap());
 //!
 //! let n = BitArray::ones(10);
 //! assert_eq!(n.len(), 10);
-//! //assert_eq!(n, "1111111111".parse().unwrap());
+//! assert_eq!(n, "1111111111".parse().unwrap());
 //! ```
 //!
 //! Some miscellaneous utilities include the ability to count bits, compute distances, and create
@@ -93,6 +101,7 @@
 
 use num::{BigUint, One, Zero};
 use smallvec::SmallVec;
+use std::cmp::max;
 use std::fmt::{Display, Formatter};
 use std::io;
 use std::ops::{BitAnd, BitOr, BitXor, Not};
@@ -234,12 +243,20 @@ impl<'a> FromIterator<&'a bool> for BitArray {
     }
 }
 
-fn create_from(one: &BitArray, two: &BitArray, op: fn(u64, u64) -> u64) -> BitArray {
-    assert_eq!(one.len(), two.len());
+fn create_from(one: &BitArray, two: &BitArray, identity: bool, op: fn(u64, u64) -> u64) -> BitArray {
+    // This works as it stands for "or" and "xor". It would be tricky to make work for "and" but not impossible.
+    assert!(!identity || one.len() == two.len());
     let mut result = BitArray::new();
-    result.size = one.len();
-    for i in 0..one.bits.len() {
-        result.bits.push(op(one.bits[i], two.bits[i]));
+    result.size = max(one.len(), two.len());
+    let result_bits_len = max(one.bits.len(), two.bits.len());
+    for i in 0..result_bits_len {
+        if i >= one.bits.len() {
+            result.bits.push(two.bits[i]);
+        } else if i >= two.bits.len() {
+            result.bits.push(one.bits[i]);
+        } else {
+            result.bits.push(op(one.bits[i], two.bits[i]));
+        }
     }
     result
 }
@@ -248,7 +265,7 @@ impl BitXor for &BitArray {
     type Output = BitArray;
 
     fn bitxor(self, rhs: Self) -> Self::Output {
-        create_from(self, rhs, |a, b| a ^ b)
+        create_from(self, rhs, false, |a, b| a ^ b)
     }
 }
 
@@ -256,7 +273,7 @@ impl BitAnd for &BitArray {
     type Output = BitArray;
 
     fn bitand(self, rhs: Self) -> Self::Output {
-        create_from(self, rhs, |a, b| a & b)
+        create_from(self, rhs, true, |a, b| a & b)
     }
 }
 
@@ -264,7 +281,7 @@ impl BitOr for &BitArray {
     type Output = BitArray;
 
     fn bitor(self, rhs: Self) -> Self::Output {
-        create_from(self, rhs, |a, b| a | b)
+        create_from(self, rhs, false, |a, b| a | b)
     }
 }
 
