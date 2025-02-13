@@ -101,6 +101,12 @@ impl BitArray {
         !&BitArray::zeros(num_ones)
     }
 
+    /// Returns the underlying `u64` words in which the bits are stored.
+    /// Useful for serializations outside the Rust ecosystem.
+    pub fn words(&self) -> Vec<u64> {
+        self.bits.iter().copied().collect()
+    }
+
     pub fn from(bits: &[bool]) -> Self {
         // I tried implementing From<&[bool]> but it demanded a slice length in the trait bound.
         bits.iter().collect()
