@@ -124,7 +124,6 @@ impl BitArray {
         if num_zeros % 64 > 0 {
             num_words += 1;
         }
-        println!("num_words:{}", num_words);
         let mut bits = SmallVec::new();
         for _ in 0..num_words {
             bits.push(0);
