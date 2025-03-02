@@ -141,6 +141,12 @@ impl BitArray {
         self.bits.iter().copied().collect()
     }
 
+    /// Adds 64 values encoded in a `u64`. Complementary to the `words()`
+    /// method.
+    pub fn push_word(&mut self, word: u64) {
+        self.bits.push(word);
+    }
+
     pub fn from(bits: &[bool]) -> Self {
         // I tried implementing From<&[bool]> but it demanded a slice length in the trait bound.
         bits.iter().collect()
