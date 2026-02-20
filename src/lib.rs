@@ -152,7 +152,7 @@ impl BitArray {
         bits.iter().collect()
     }
 
-    pub fn iter(&self) -> BitArrayIterator {
+    pub fn iter<'a>(&'a self) -> BitArrayIterator<'a> {
         BitArrayIterator::iter_for(&self)
     }
 
