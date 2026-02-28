@@ -104,7 +104,7 @@ use smallvec::SmallVec;
 use std::cmp::max;
 use std::fmt::{Display, Formatter};
 use std::io;
-use std::ops::{BitAnd, BitOr, BitXor, Not};
+use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, Not};
 use std::str::FromStr;
 
 #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Clone, Debug, Default)]
@@ -293,6 +293,22 @@ impl BitOr for &BitArray {
 
     fn bitor(self, rhs: Self) -> Self::Output {
         create_from(self, rhs, false, |a, b| a | b)
+    }
+}
+
+impl BitOrAssign for BitArray {
+    fn bitor_assign(&mut self, rhs: Self) {
+        for i in 0..self.bits.len() {
+            self.bits[i] |= rhs.bits[i];
+        }
+    }
+}
+
+impl BitAndAssign for BitArray {
+    fn bitand_assign(&mut self, rhs: Self) {
+        for i in 0..self.bits.len() {
+            self.bits[i] &= rhs.bits[i];
+        }
     }
 }
 
@@ -591,5 +607,21 @@ mod tests {
                 .parse()
                 .unwrap()
         );
+    }
+
+    #[test]
+    fn test_or_and_assign() {
+        let a: BitArray = "1010101".parse().unwrap();
+        let b: BitArray = "1100111".parse().unwrap();
+
+        let mut c = a.clone();
+        c |= b.clone();
+        let ex1: BitArray = "1110111".parse().unwrap();
+        assert_eq!(ex1, c);
+
+        let mut d = a.clone();
+        d &= b.clone();
+        let ex2: BitArray = "1000101".parse().unwrap();
+        assert_eq!(ex2, d);
     }
 }
