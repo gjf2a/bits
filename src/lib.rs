@@ -28,20 +28,26 @@
 //! assert_eq!(&b2 & &b3, "0010".parse().unwrap());
 //! ```
 //!
-//! `BitArray` objects can be built incrementally using the `add()` method. The first digit
-//! added is the lowest-order bit. Each successive `add()` adds its bit as the next-highest order.
+//! `BitArray` objects can be built incrementally using the `push()` method. The first digit
+//! added is the lowest-order bit. Each successive `push()` adds its bit as the next-highest order.
+//! Likewise, whatever is added with `push()` can be removed with `pop()`.
 //!
 //! ```
 //! use bits::*;
 //!
 //! let mut b = BitArray::new();
-//! b.add(true);
-//! b.add(false);
-//! b.add(true);
-//! b.add(true);
+//! b.push(true);
+//! b.push(false);
+//! b.push(true);
+//! b.push(true);
 //!
 //! assert_eq!(b, "1101".parse().unwrap());
 //! assert_eq!(num::BigUint::from(&b), num::BigUint::from(13 as u32));
+//! 
+//! for i in 0..b.len() {
+//!     assert_eq!(b.pop().unwrap(), i != 2);
+//! }
+//! assert_eq!(b.pop(), None);
 //! ```
 //!
 //! `BitArray` objects can also be expanded and modified using the `set()` method.
@@ -168,7 +174,7 @@ impl BitArray {
         self.size
     }
 
-    pub fn add(&mut self, value: bool) {
+    pub fn push(&mut self, value: bool) {
         self.set(self.size, value);
     }
 
@@ -184,6 +190,15 @@ impl BitArray {
             self.bits[BitArray::find_word(index)] |= mask;
         } else {
             self.bits[BitArray::find_word(index)] &= !mask;
+        }
+    }
+
+    pub fn pop(&mut self) -> Option<bool> {
+        if self.size == 0 {
+            None
+        } else {
+            self.size -= 1;
+            Some(self.is_set(self.size))
         }
     }
 
@@ -220,7 +235,7 @@ impl FromIterator<bool> for BitArray {
     fn from_iter<T: IntoIterator<Item = bool>>(iter: T) -> Self {
         let mut result = BitArray::new();
         for value in iter {
-            result.add(value);
+            result.push(value);
         }
         result
     }
@@ -230,7 +245,7 @@ impl<'a> FromIterator<&'a bool> for BitArray {
     fn from_iter<T: IntoIterator<Item = &'a bool>>(iter: T) -> Self {
         let mut result = BitArray::new();
         for value in iter {
-            result.add(*value);
+            result.push(*value);
         }
         result
     }
@@ -343,7 +358,7 @@ impl FromStr for BitArray {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut result = BitArray::new();
         for ch in s.chars().rev() {
-            result.add(match ch {
+            result.push(match ch {
                 '0' => false,
                 '1' => true,
                 other => {
@@ -379,18 +394,18 @@ mod tests {
     fn test_bits() {
         let mut b = BitArray::new();
         assert_eq!(0, b.len());
-        b.add(false);
+        b.push(false);
         assert_eq!(1, b.len());
         assert!(!b.is_set(0));
         assert_eq!(0, b.count_bits_on());
 
-        b.add(true);
+        b.push(true);
         assert_eq!(2, b.len());
         assert!(b.is_set(1));
         assert_eq!(1, b.count_bits_on());
 
         for _ in 0..BitArray::bits_per_word() {
-            b.add(true);
+            b.push(true);
         }
         assert_eq!(BitArray::bits_per_word() + 2, b.len() as usize);
         for i in 1..b.len() {
@@ -400,7 +415,7 @@ mod tests {
 
         let mut b2 = BitArray::new();
         for i in 0..b.len() {
-            b2.add(i % 2 == 0);
+            b2.push(i % 2 == 0);
         }
 
         let b3 = &b ^ &b2;
