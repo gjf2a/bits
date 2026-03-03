@@ -81,8 +81,7 @@
 //! assert_eq!(n, "1111111111".parse().unwrap());
 //! ```
 //!
-//! Some miscellaneous utilities include the ability to count bits, compute distances, and create
-//! combinations.
+//! Some miscellaneous utilities include the ability to count bits and compute distances.
 //!
 //! ```
 //! use bits::*;
@@ -93,10 +92,6 @@
 //! assert_eq!(b1.count_bits_on(), 3);
 //! assert_eq!(b2.count_bits_on(), 2);
 //! assert_eq!(distance(&b1, &b2), 3);
-//!
-//! let c = BitArray::all_combinations(2);
-//! let cv: Vec<BitArray> = ["00", "10", "01", "11"].iter().map(|s| s.parse().unwrap()).collect();
-//! assert_eq!(c, cv);
 //! ```
 
 use num::{BigUint, One, Zero};
@@ -147,29 +142,8 @@ impl BitArray {
         self.bits.push(word);
     }
 
-    pub fn from(bits: &[bool]) -> Self {
-        // I tried implementing From<&[bool]> but it demanded a slice length in the trait bound.
-        bits.iter().collect()
-    }
-
     pub fn iter<'a>(&'a self) -> BitArrayIterator<'a> {
         BitArrayIterator::iter_for(&self)
-    }
-
-    pub fn all_combinations(size: usize) -> Vec<Self> {
-        if size == 0 {
-            vec![BitArray::new()]
-        } else {
-            let mut result = Vec::new();
-            for mut candidate in BitArray::all_combinations(size - 1) {
-                let mut candidate1 = candidate.clone();
-                candidate1.add(false);
-                result.push(candidate1);
-                candidate.add(true);
-                result.push(candidate);
-            }
-            result
-        }
     }
 
     fn make_mask(index: u64) -> u64 {
@@ -217,6 +191,12 @@ impl BitArray {
 
     pub fn count_bits_on(&self) -> u64 {
         self.bits.iter().map(|word| word.count_ones() as u64).sum()
+    }
+}
+
+impl From<&[bool]> for BitArray {
+    fn from(value: &[bool]) -> Self {
+        value.iter().collect()
     }
 }
 
@@ -453,26 +433,11 @@ mod tests {
 
     #[test]
     fn test_from() {
-        let mut b = BitArray::from(&[true, true, false, false, true]);
+        let bools = [true, true, false, false, true];
+        let mut b: BitArray = (&bools[..]).into();
         b.set(2, true);
-        assert_eq!(b, BitArray::from(&[true, true, true, false, true]));
-    }
-
-    #[test]
-    fn test_all_combinations() {
-        assert_eq!(
-            BitArray::all_combinations(1),
-            vec![BitArray::from(&[false]), BitArray::from(&[true])]
-        );
-        assert_eq!(
-            BitArray::all_combinations(2),
-            vec![
-                BitArray::from(&[false, false]),
-                BitArray::from(&[false, true]),
-                BitArray::from(&[true, false]),
-                BitArray::from(&[true, true])
-            ]
-        );
+        let expected = [true, true, true, false, true];
+        assert_eq!(b, BitArray::from(&expected[..]));
     }
 
     #[test]
@@ -483,11 +448,11 @@ mod tests {
         // low-order bit in the source array is the leftmost element.
         for (b, s) in [
             (
-                BitArray::from(&[true, false, false, true, true, false, true]),
+                BitArray::from(&[true, false, false, true, true, false, true][..]),
                 "1011001",
             ),
             (
-                BitArray::from(&[false, true, true, false, true, true, true]),
+                BitArray::from(&[false, true, true, false, true, true, true][..]),
                 "1110110",
             ),
         ] {
@@ -516,7 +481,7 @@ mod tests {
             [true, true, false, false, true],
             [false, true, false, false, false],
         ] {
-            let b = BitArray::from(&bool_vals);
+            let b: BitArray = (&bool_vals[..]).into();
             for (i, val) in b.iter().enumerate() {
                 assert_eq!(val, bool_vals[i]);
             }
