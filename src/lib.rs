@@ -3,9 +3,9 @@
 //! the `&`, `|` and `^` binary operators and the `!` unary operator. Because copies could get
 //! expensive, these operators are intended to be used by reference.
 //!
-//! If the lengths of the arguments to a binary operator differ:
-//! * The `&` operator will **panic**.
-//! * The '|' and '^' operators will produce a result with the same length as the longer argument, with `false` as the implicit value of the missing bits of the smaller argument.
+//! If the lengths of the arguments to a binary operator differ, each operator will produce a result 
+//! with the same length as the longer argument, with `false` as the implicit value of the missing 
+//! bits of the smaller argument.
 //!
 //! ```
 //! use bits::*;
@@ -24,6 +24,8 @@
 //! assert_eq!(&b2 | &b3, b2);
 //! assert_eq!(&b1 ^ &b3, BitArray::ones(4));
 //! assert_eq!(&b2 ^ &b3, "0100".parse().unwrap());
+//! assert_eq!(&b1 & &b3, BitArray::zeros(4));
+//! assert_eq!(&b2 & &b3, "0010".parse().unwrap());
 //! ```
 //!
 //! `BitArray` objects can be built incrementally using the `add()` method. The first digit
@@ -234,17 +236,15 @@ impl<'a> FromIterator<&'a bool> for BitArray {
     }
 }
 
-fn create_from(one: &BitArray, two: &BitArray, identity: bool, op: fn(u64, u64) -> u64) -> BitArray {
-    // This works as it stands for "or" and "xor". It would be tricky to make work for "and" but not impossible.
-    assert!(!identity || one.len() == two.len());
+fn create_from(one: &BitArray, two: &BitArray, op: fn(u64, u64) -> u64) -> BitArray {
     let mut result = BitArray::new();
     result.size = max(one.len(), two.len());
     let result_bits_len = max(one.bits.len(), two.bits.len());
     for i in 0..result_bits_len {
         if i >= one.bits.len() {
-            result.bits.push(two.bits[i]);
+            result.bits.push(op(two.bits[i], 0));
         } else if i >= two.bits.len() {
-            result.bits.push(one.bits[i]);
+            result.bits.push(op(one.bits[i], 0));
         } else {
             result.bits.push(op(one.bits[i], two.bits[i]));
         }
@@ -256,7 +256,7 @@ impl BitXor for &BitArray {
     type Output = BitArray;
 
     fn bitxor(self, rhs: Self) -> Self::Output {
-        create_from(self, rhs, false, |a, b| a ^ b)
+        create_from(self, rhs, |a, b| a ^ b)
     }
 }
 
@@ -264,7 +264,7 @@ impl BitAnd for &BitArray {
     type Output = BitArray;
 
     fn bitand(self, rhs: Self) -> Self::Output {
-        create_from(self, rhs, true, |a, b| a & b)
+        create_from(self, rhs, |a, b| a & b)
     }
 }
 
@@ -272,7 +272,7 @@ impl BitOr for &BitArray {
     type Output = BitArray;
 
     fn bitor(self, rhs: Self) -> Self::Output {
-        create_from(self, rhs, false, |a, b| a | b)
+        create_from(self, rhs, |a, b| a | b)
     }
 }
 
