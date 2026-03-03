@@ -71,11 +71,11 @@
 //! b.set(500, true);
 //! assert!(b.is_set(500));
 //! assert_eq!(b.len(), 501);
-//! assert_eq!(b.count_bits_on(), 2);
+//! assert_eq!(b.count_ones(), 2);
 //! ```
 //!
 //! `BitArray` objects can also be created by specifying a number of zeros or ones for
-//! initialization.
+//! initialization, as well as by collection.
 //!
 //! ```
 //! use bits::*;
@@ -87,9 +87,12 @@
 //! let n = BitArray::ones(10);
 //! assert_eq!(n.len(), 10);
 //! assert_eq!(n, "1111111111".parse().unwrap());
+//! 
+//! let odd = (0..6).map(|i| i % 2 == 1).collect::<BitArray>();
+//! assert_eq!(odd, "101010".parse().unwrap());
 //! ```
 //!
-//! Some miscellaneous utilities include the ability to count bits and compute distances.
+//! Other features include counting bits, finding 1s, and computing distances.
 //!
 //! ```
 //! use bits::*;
@@ -97,9 +100,22 @@
 //! let b1: BitArray = "1101".parse().unwrap();
 //! let b2: BitArray = "0110".parse().unwrap();
 //!
-//! assert_eq!(b1.count_bits_on(), 3);
-//! assert_eq!(b2.count_bits_on(), 2);
+//! assert_eq!(b1.count_ones(), 3);
+//! assert_eq!(b2.count_ones(), 2);
 //! assert_eq!(distance(&b1, &b2), 3);
+//! 
+//! let b1_ones = b1.one_indices().collect::<Vec<_>>();
+//! assert_eq!(b1_ones, vec![0, 2, 3]);
+//! let b2_ones = b2.one_indices().collect::<Vec<_>>();
+//! assert_eq!(b2_ones, vec![1, 2]);
+//! 
+//! let mut b3 = BitArray::zeros(640);
+//! let targets = vec![60, 80, 130, 150, 256, 512];
+//! for i in targets.iter() {
+//!     b3.set(*i, true);
+//! }
+//! let b3_ones = b3.one_indices().collect::<Vec<_>>();
+//! assert_eq!(b3_ones, targets);
 //! ```
 
 use num::{BigUint, One, Zero};
@@ -154,6 +170,10 @@ impl BitArray {
         BitArrayIterator::iter_for(&self)
     }
 
+    pub fn one_indices<'a>(&'a self) -> OnesIterator<'a> {
+        OnesIterator::new(self)
+    }
+
     fn make_mask(index: u64) -> u64 {
         1 << BitArray::find_offset(index)
     }
@@ -206,7 +226,7 @@ impl BitArray {
         self.bits[BitArray::find_word(index)] & BitArray::make_mask(index) > 0
     }
 
-    pub fn count_bits_on(&self) -> u64 {
+    pub fn count_ones(&self) -> u64 {
         self.bits.iter().map(|word| word.count_ones() as u64).sum()
     }
 }
@@ -218,7 +238,7 @@ impl From<&[bool]> for BitArray {
 }
 
 pub fn distance(b1: &BitArray, b2: &BitArray) -> u64 {
-    (b1 ^ b2).count_bits_on()
+    (b1 ^ b2).count_ones()
 }
 
 impl Display for BitArray {
@@ -297,6 +317,44 @@ impl Not for &BitArray {
     fn not(self) -> Self::Output {
         self.iter().map(|v| !v).collect()
     }
+}
+
+pub struct OnesIterator<'a> {
+    src: &'a BitArray,
+    word_index: usize,
+    word_value: u64,
+}
+
+impl<'a> OnesIterator<'a> {
+    pub fn new(src: &'a BitArray) -> Self {
+        Self {
+            src,
+            word_index: 0,
+            word_value: src.bits[0],
+        }
+    }
+}
+
+impl<'a> Iterator for OnesIterator<'a> {
+    type Item = u64;
+    
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if self.word_value != 0 {
+                break;
+            } else {
+                self.word_index += 1;
+                if self.word_index == self.src.bits.len() {
+                    return None;
+                } else {
+                    self.word_value = self.src.bits[self.word_index];
+                }
+            }
+        }
+        let offset = self.word_value.trailing_zeros();
+        self.word_value &= self.word_value - 1;
+        Some(self.word_index as u64 * 64 + offset as u64)   
+    }    
 }
 
 pub struct BitArrayIterator<'a> {
@@ -397,12 +455,12 @@ mod tests {
         b.push(false);
         assert_eq!(1, b.len());
         assert!(!b.is_set(0));
-        assert_eq!(0, b.count_bits_on());
+        assert_eq!(0, b.count_ones());
 
         b.push(true);
         assert_eq!(2, b.len());
         assert!(b.is_set(1));
-        assert_eq!(1, b.count_bits_on());
+        assert_eq!(1, b.count_ones());
 
         for _ in 0..BitArray::bits_per_word() {
             b.push(true);
@@ -411,7 +469,7 @@ mod tests {
         for i in 1..b.len() {
             assert!(b.is_set(i));
         }
-        assert_eq!(b.len() as u64 - 1, b.count_bits_on());
+        assert_eq!(b.len() as u64 - 1, b.count_ones());
 
         let mut b2 = BitArray::new();
         for i in 0..b.len() {
@@ -419,8 +477,8 @@ mod tests {
         }
 
         let b3 = &b ^ &b2;
-        assert_eq!((b.len() as u64 / 2) + 1, b3.count_bits_on());
-        assert_eq!(b3.count_bits_on(), distance(&b, &b2));
+        assert_eq!((b.len() as u64 / 2) + 1, b3.count_ones());
+        assert_eq!(b3.count_ones(), distance(&b, &b2));
 
         assert_ne!(b, b2);
         assert_ne!(b2, b3);
