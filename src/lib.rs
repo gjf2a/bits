@@ -75,7 +75,10 @@
 //! ```
 //!
 //! `BitArray` objects can also be created by specifying a number of zeros or ones for
-//! initialization, as well as by collection.
+//! initialization, as well as by collection. The collected sequence can consist of
+//! boolean values, which get assigned to sequential indices, or `u64` values,
+//! for which the resulting `BitArray` sets a value of 1 at the index for 
+//! each collected integer. 
 //!
 //! ```
 //! use bits::*;
@@ -90,6 +93,11 @@
 //! 
 //! let odd = (0..6).map(|i| i % 2 == 1).collect::<BitArray>();
 //! assert_eq!(odd, "101010".parse().unwrap());
+//! 
+//! let nums = vec![2, 4, 7, 12, 64, 65, 129];
+//! let num_set = nums.iter().collect::<BitArray>();
+//! let rebuilt = num_set.one_indices().collect::<Vec<_>>();
+//! assert_eq!(rebuilt, nums);
 //! ```
 //!
 //! Other features include counting bits, finding 1s, and computing distances.
@@ -266,6 +274,26 @@ impl<'a> FromIterator<&'a bool> for BitArray {
         let mut result = BitArray::new();
         for value in iter {
             result.push(*value);
+        }
+        result
+    }
+}
+
+impl FromIterator<u64> for BitArray {
+    fn from_iter<T: IntoIterator<Item = u64>>(iter: T) -> Self {
+        let mut result = BitArray::new();
+        for value in iter {
+            result.set(value, true);
+        }
+        result
+    }
+}
+
+impl<'a> FromIterator<&'a u64> for BitArray {
+    fn from_iter<T: IntoIterator<Item = &'a u64>>(iter: T) -> Self {
+        let mut result = BitArray::new();
+        for value in iter {
+            result.set(*value, true);
         }
         result
     }
