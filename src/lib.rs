@@ -105,13 +105,17 @@
 //! ```
 //! use bits::*;
 //!
+//! let b0: BitArray = "0000".parse().unwrap();
 //! let b1: BitArray = "1101".parse().unwrap();
 //! let b2: BitArray = "0110".parse().unwrap();
 //!
+//! assert_eq!(b0.count_ones(), 0);
 //! assert_eq!(b1.count_ones(), 3);
 //! assert_eq!(b2.count_ones(), 2);
 //! assert_eq!(distance(&b1, &b2), 3);
 //! 
+//! let b0_ones = b0.one_indices().collect::<Vec<_>>();
+//! assert_eq!(b0_ones, vec![]);
 //! let b1_ones = b1.one_indices().collect::<Vec<_>>();
 //! assert_eq!(b1_ones, vec![0, 2, 3]);
 //! let b2_ones = b2.one_indices().collect::<Vec<_>>();
