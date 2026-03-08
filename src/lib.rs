@@ -358,7 +358,7 @@ impl<'a> OnesIterator<'a> {
         Self {
             src,
             word_index: 0,
-            word_value: src.bits[0],
+            word_value: if src.bits.len() > 0 {src.bits[0]} else {0},
         }
     }
 }
@@ -372,7 +372,7 @@ impl<'a> Iterator for OnesIterator<'a> {
                 break;
             } else {
                 self.word_index += 1;
-                if self.word_index == self.src.bits.len() {
+                if self.word_index >= self.src.bits.len() {
                     return None;
                 } else {
                     self.word_value = self.src.bits[self.word_index];
@@ -657,5 +657,12 @@ mod tests {
                 .parse()
                 .unwrap()
         );
+    }
+
+    #[test]
+    fn test_empty_ones() {
+        let bits = BitArray::default();
+        let ones = bits.one_indices().collect::<Vec<_>>();
+        assert_eq!(ones.len(), 0);
     }
 }
