@@ -69,7 +69,7 @@
 //! assert_eq!(b, "0100".parse().unwrap());
 //! 
 //! b.set(500, true);
-//! assert!(b.is_set(500));
+//! assert!(b.get(500));
 //! assert_eq!(b.len(), 501);
 //! assert_eq!(b.count_ones(), 2);
 //! ```
@@ -141,7 +141,7 @@ use std::str::FromStr;
 #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Clone, Debug, Default)]
 pub struct BitArray {
     bits: SmallVec<[u64; 4]>,
-    size: u64,
+    size: usize,
 }
 
 impl BitArray {
@@ -149,7 +149,7 @@ impl BitArray {
         Default::default()
     }
 
-    pub fn zeros(num_zeros: u64) -> Self {
+    pub fn zeros(num_zeros: usize) -> Self {
         let size = num_zeros;
         let mut num_words = num_zeros / 64;
         if num_zeros % 64 > 0 {
@@ -162,7 +162,7 @@ impl BitArray {
         BitArray { bits, size }
     }
 
-    pub fn ones(num_ones: u64) -> Self {
+    pub fn ones(num_ones: usize) -> Self {
         !&BitArray::zeros(num_ones)
     }
 
@@ -186,23 +186,23 @@ impl BitArray {
         OnesIterator::new(self)
     }
 
-    fn make_mask(index: u64) -> u64 {
+    fn make_mask(index: usize) -> u64 {
         1 << BitArray::find_offset(index)
     }
 
-    fn find_offset(index: u64) -> u64 {
-        index % (BitArray::bits_per_word() as u64)
+    fn find_offset(index: usize) -> usize {
+        index % BitArray::bits_per_word()
     }
 
-    fn find_word(index: u64) -> usize {
-        (index as usize / BitArray::bits_per_word()) as usize
+    fn find_word(index: usize) -> usize {
+        index / BitArray::bits_per_word()
     }
 
     pub fn bits_per_word() -> usize {
         std::mem::size_of::<u64>() * 8
     }
 
-    pub fn len(&self) -> u64 {
+    pub fn len(&self) -> usize {
         self.size
     }
 
@@ -210,7 +210,7 @@ impl BitArray {
         self.set(self.size, value);
     }
 
-    pub fn set(&mut self, index: u64, value: bool) {
+    pub fn set(&mut self, index: usize, value: bool) {
         while self.bits.len() < 1 + BitArray::find_word(index) {
             self.bits.push(0);
         }
@@ -230,11 +230,11 @@ impl BitArray {
             None
         } else {
             self.size -= 1;
-            Some(self.is_set(self.size))
+            Some(self.get(self.size))
         }
     }
 
-    pub fn is_set(&self, index: u64) -> bool {
+    pub fn get(&self, index: usize) -> bool {
         self.bits[BitArray::find_word(index)] & BitArray::make_mask(index) > 0
     }
 
@@ -283,8 +283,8 @@ impl<'a> FromIterator<&'a bool> for BitArray {
     }
 }
 
-impl FromIterator<u64> for BitArray {
-    fn from_iter<T: IntoIterator<Item = u64>>(iter: T) -> Self {
+impl FromIterator<usize> for BitArray {
+    fn from_iter<T: IntoIterator<Item = usize>>(iter: T) -> Self {
         let mut result = BitArray::new();
         for value in iter {
             result.set(value, true);
@@ -293,13 +293,9 @@ impl FromIterator<u64> for BitArray {
     }
 }
 
-impl<'a> FromIterator<&'a u64> for BitArray {
-    fn from_iter<T: IntoIterator<Item = &'a u64>>(iter: T) -> Self {
-        let mut result = BitArray::new();
-        for value in iter {
-            result.set(*value, true);
-        }
-        result
+impl<'a> FromIterator<&'a usize> for BitArray {
+    fn from_iter<T: IntoIterator<Item = &'a usize>>(iter: T) -> Self {
+        iter.into_iter().copied().collect()
     }
 }
 
@@ -368,7 +364,7 @@ impl<'a> OnesIterator<'a> {
 }
 
 impl<'a> Iterator for OnesIterator<'a> {
-    type Item = u64;
+    type Item = usize;
     
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -385,13 +381,13 @@ impl<'a> Iterator for OnesIterator<'a> {
         }
         let offset = self.word_value.trailing_zeros();
         self.word_value &= self.word_value - 1;
-        Some(self.word_index as u64 * 64 + offset as u64)   
+        Some(self.word_index * 64 + offset as usize)   
     }    
 }
 
 pub struct BitArrayIterator<'a> {
-    forward_index: u64,
-    back_index: u64,
+    forward_index: usize,
+    back_index: usize,
     src: &'a BitArray,
 }
 
@@ -414,7 +410,7 @@ impl<'a> Iterator for BitArrayIterator<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.valid() {
-            let result = Some(self.src.is_set(self.forward_index));
+            let result = Some(self.src.get(self.forward_index));
             self.forward_index += 1;
             result
         } else {
@@ -432,7 +428,7 @@ impl<'a> DoubleEndedIterator for BitArrayIterator<'a> {
     fn next_back(&mut self) -> Option<Self::Item> {
         if self.valid() {
             self.back_index -= 1;
-            let result = Some(self.src.is_set(self.back_index));
+            let result = Some(self.src.get(self.back_index));
             result
         } else {
             None
@@ -486,12 +482,12 @@ mod tests {
         assert_eq!(0, b.len());
         b.push(false);
         assert_eq!(1, b.len());
-        assert!(!b.is_set(0));
+        assert!(!b.get(0));
         assert_eq!(0, b.count_ones());
 
         b.push(true);
         assert_eq!(2, b.len());
-        assert!(b.is_set(1));
+        assert!(b.get(1));
         assert_eq!(1, b.count_ones());
 
         for _ in 0..BitArray::bits_per_word() {
@@ -499,7 +495,7 @@ mod tests {
         }
         assert_eq!(BitArray::bits_per_word() + 2, b.len() as usize);
         for i in 1..b.len() {
-            assert!(b.is_set(i));
+            assert!(b.get(i));
         }
         assert_eq!(b.len() as u64 - 1, b.count_ones());
 
