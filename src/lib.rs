@@ -131,6 +131,7 @@
 //! ```
 
 use num::{BigUint, One, Zero};
+use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::cmp::max;
 use std::fmt::{Display, Formatter};
@@ -138,7 +139,7 @@ use std::io;
 use std::ops::{BitAnd, BitOr, BitXor, Not};
 use std::str::FromStr;
 
-#[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Hash, Eq, PartialEq, Ord, PartialOrd, Clone, Debug, Default)]
 pub struct BitArray {
     bits: SmallVec<[u64; 4]>,
     size: usize,
